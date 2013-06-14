@@ -26,7 +26,7 @@ end
 
 class TextScroller
   SYNC_DELAY = 0.450
-  SPEED = 7
+  SPEED = 6
   FEED_IN = 5 # how many launchpads in start the word in
   FEED_FIXES = 3
   GRID_WIDTH = 9
