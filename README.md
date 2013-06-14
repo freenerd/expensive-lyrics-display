@@ -7,7 +7,7 @@ This is a script that shows lyrics on several Novation Launchpad S. It uses the 
 It was developed by @freenerd at Music Hack Day Barcelona 2013 with lots of help of Ross from Novation, who wrote the firmware patch.
 
 A video demonstration can be seen here:
-TO BE DONE, ARGH
+https://www.youtube.com/watch?v=btFvX0cb5D8
 
 ## Requirements
 
