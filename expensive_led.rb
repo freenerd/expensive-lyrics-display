@@ -1,16 +1,19 @@
-#$LOAD_PATH << '/tmp/launchpad/launchpad/lib'
 require 'launchpad'
-require 'faye/websocket'
-require 'eventmachine'
+require 'em-websocket-client'
 require 'json'
 
 # Monkeypatch the launchpad library
 module Launchpad
   class Device
-    def marque(text, offset, speed)
-      color = 60
+    def marque(text, speed, offset=nil)
+      color = 60 # full green
 
-      code = [240, 0, 32, 41, 9, color, offset, speed]
+      code = [240, 0, 32, 41, 9, color]
+
+      # special char for patched launchpad firmware
+      code << offset if offset
+
+      code << speed
       text.each_byte { |c| code << c }
       code << 247
 
@@ -21,10 +24,9 @@ module Launchpad
 end
 
 class TextScroller
-  #SYNC_DELAY = 0.720
   SYNC_DELAY = 0.450
   SPEED = 7
-  FEED_IN = 9
+  FEED_IN = 4 # how many launchpads in start the word in
   FEED_FIXES = 3
   GRID_WIDTH = 9
 
@@ -37,29 +39,33 @@ class TextScroller
   end
 
   def reset
-    @devices.each do |device|
-      device.marque("", 0, SPEED)
+    @devices.reverse.each do |device|
+      device.marque("", SPEED, 0)
       device.reset
     end
   end
 
   def close
+    self.reset
     @devices.each do |device|
-      device.reset
       device.close
     end
   end
 
+  def feed_in
+    [ FEED_IN, @devices.length ].min
+  end
+
   def get_offset(launchpad_index)
-    if launchpad_index < FEED_IN
-      GRID_WIDTH * (FEED_IN - launchpad_index) + FEED_FIXES
+    if launchpad_index < feed_in
+      GRID_WIDTH * (feed_in - launchpad_index) + FEED_FIXES
     else
       0
     end
   end
 
   def get_sync_delay(launchpad_index)
-    launchpad_index < FEED_IN ? 0 : SYNC_DELAY
+    launchpad_index < feed_in ? 0 : SYNC_DELAY
   end
 
   def output(text)
@@ -74,7 +80,7 @@ class TextScroller
         offset = get_offset(launchpad_index)
         sync_delay = get_sync_delay(launchpad_index)
 
-        device.marque(text, offset, SPEED)
+        device.marque(text, SPEED, offset)
         sleep(sync_delay)
       end
     end
@@ -97,20 +103,27 @@ class TextScroller
 
   def run_websockets(url)
     EM.run do
-      ws = Faye::WebSocket::Client.new(url)
+      conn = EventMachine::WebSocketClient.connect(url)
 
-      ws.on :open do |event|
-        p [:open]
-        ws.send('Hello, world!')
+      conn.callback do
+        conn.send_msg "Hello!"
+        conn.send_msg "done"
       end
 
-      ws.on :message do |event|
-        p [:message, event.data]
+      conn.errback do |e|
+        puts "Got error: #{e}"
       end
 
-      ws.on :close do |event|
-        p [:close, event.code, event.reason]
-        ws = nil
+      conn.stream do |msg|
+        puts "<#{msg}>"
+        if msg.data == "done"
+          conn.close_connection
+        end
+      end
+
+      conn.disconnect do
+        puts "gone"
+        EM::stop_event_loop
       end
     end
   end
@@ -167,8 +180,8 @@ class TextScrollerInput
 
 
   def load_lyrics_file
-    @lyrics = JSON.parse(File.read("daftpunk_getlucky.json")).map do |line|
-      { :time => line["time"]["total"] - 30, :text => line["text"] }
+    @lyrics = JSON.parse(File.read("daftpunk_harder.json")).map do |line|
+      { :time => line["time"]["total"] - 50, :text => line["text"] }
     end
 
     self
@@ -205,5 +218,5 @@ text_scroller = TextScroller.new(
 
 trap("SIGINT") { text_scroller.close; exit }
 
-text_scroller.run_websockets("http://37.34.69.146:8080")
-#text_scroller.run
+#text_scroller.run_websockets("ws://37.34.69.176:8080")
+text_scroller.run
