@@ -1,12 +1,14 @@
 $LOAD_PATH << '/tmp/launchpad/launchpad/lib'
 require 'launchpad'
+require 'faye/websocket'
+require 'eventmachine'
 require 'json'
 
 class TextScroller
   #SYNC_DELAY = 0.720
   SYNC_DELAY = 0.450
   SPEED = 7
-  FEED_IN = 6
+  FEED_IN = 9
   FEED_FIXES = 3
   GRID_WIDTH = 9
 
@@ -77,6 +79,26 @@ class TextScroller
     end
   end
 
+  def run_websockets(url)
+    EM.run do
+      ws = Faye::WebSocket::Client.new(url)
+
+      ws.on :open do |event|
+        p [:open]
+        ws.send('Hello, world!')
+      end
+
+      ws.on :message do |event|
+        p [:message, event.data]
+      end
+
+      ws.on :close do |event|
+        p [:close, event.code, event.reason]
+        ws = nil
+      end
+    end
+  end
+
   private
 
   # Launchpads are setup in order of their Launchpad S id
@@ -124,18 +146,13 @@ class TextScrollerInput
         { :time => 7.000, :text => "Stronger" }
       ]
 
-    #@lyrics = [
-        #{ :time => 0, :text => "Stronger" },
-        #{ :time => 3.000, :text => "Stronger" },
-      #]
-
     self
   end
 
 
   def load_lyrics_file
-    @lyrics = JSON.parse(File.read("daftpunk_harder.json")).map do |line|
-      { :time => line["time"]["total"] - 50, :text => line["text"] }
+    @lyrics = JSON.parse(File.read("daftpunk_getlucky.json")).map do |line|
+      { :time => line["time"]["total"] - 30, :text => line["text"] }
     end
 
     self
@@ -172,4 +189,5 @@ text_scroller = TextScroller.new(
 
 trap("SIGINT") { text_scroller.close; exit }
 
+#text_scroller.run_websockets("ws://www.example.com/")
 text_scroller.run
