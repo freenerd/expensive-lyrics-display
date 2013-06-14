@@ -192,8 +192,7 @@ class TextScrollerInput
   def ensure_counter
     raise "No lyrics loaded" unless @lyrics
     if @counter >= @lyrics.length
-      # start from beginning
-      @counter = 0
+      exit()
     end
   end
 end
