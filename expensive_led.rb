@@ -1,62 +1,87 @@
-$LOAD_PATH << '/tmp/launchpad/launchpad/lib'
 require 'launchpad'
+require 'socketio'
+require 'eventmachine'
 require 'json'
 
+# Monkeypatch the launchpad library
+module Launchpad
+  class Device
+    def marque(text, speed, offset=nil)
+      color = 60 # full green
+
+      code = [240, 0, 32, 41, 9, color]
+
+      # special char for patched launchpad firmware
+      code << offset if offset
+
+      code << speed
+      text.each_byte { |c| code << c }
+      code << 247
+
+      p code
+      @output.write_sysex(code)
+    end
+  end
+end
+
 class TextScroller
-  #SYNC_DELAY = 0.720
   SYNC_DELAY = 0.450
   SPEED = 7
-  FEED_IN = 6
+  FEED_IN = 5 # how many launchpads in start the word in
   FEED_FIXES = 3
   GRID_WIDTH = 9
 
   def initialize(input)
     @devices = []
     @input = input
-    @threads = []
+    @thread = nil
 
     setup_devices
   end
 
   def reset
+    @thread.exit if @thread
+
     @devices.each do |device|
-      device.marque("", 0, SPEED)
+      device.marque("", SPEED, 0)
       device.reset
     end
   end
 
   def close
+    self.reset
     @devices.each do |device|
-      device.reset
       device.close
     end
   end
 
+  def feed_in
+    [ FEED_IN, @devices.length ].min
+  end
+
   def get_offset(launchpad_index)
-    if launchpad_index < FEED_IN
-      GRID_WIDTH * (FEED_IN - launchpad_index) + FEED_FIXES
+    if launchpad_index < feed_in
+      GRID_WIDTH * (feed_in - launchpad_index) + FEED_FIXES
     else
       0
     end
   end
 
   def get_sync_delay(launchpad_index)
-    launchpad_index < FEED_IN ? 0 : SYNC_DELAY
+    launchpad_index < feed_in ? 0 : SYNC_DELAY
   end
 
   def output(text)
     reset
 
-    @thread.kill if @thread
-
-    @threads = Thread.new do
+    @thread = Thread.new do
       p "Printing #{text}"
 
       @devices.each_with_index do |device, launchpad_index|
         offset = get_offset(launchpad_index)
         sync_delay = get_sync_delay(launchpad_index)
 
-        device.marque(text, offset, SPEED)
+        device.marque(text, SPEED, offset)
         sleep(sync_delay)
       end
     end
@@ -77,6 +102,18 @@ class TextScroller
     end
   end
 
+  def run_websockets(url)
+    object = self
+    client = SocketIO.connect(url) do
+      after_start do
+        on_event('linechanged') do |data|
+          puts data.first
+          object.output(data.first["lyrics"])
+        end
+      end
+    end
+  end
+
   private
 
   # Launchpads are setup in order of their Launchpad S id
@@ -91,7 +128,7 @@ class TextScroller
     Portmidi.output_devices.each do |device|
       device_ids << device.name
 
-      match = device.name.match(/Launchpad S (\d?)/)
+      match = device.name.match(/Launchpad S (\d+)/)
       if match && !match[1].empty?
         # it's one of the many Launchpads with numbers
         @devices[match[1].to_i] = create_device(device)
@@ -119,15 +156,10 @@ class TextScrollerInput
   def load_lyrics_test
     @lyrics = [
         { :time => 0, :text => "Harder" },
-        { :time => 2.200, :text => "Faster" },
+        { :time => 12.200, :text => "Faster" },
         { :time => 4.000, :text => "Better" },
         { :time => 7.000, :text => "Stronger" }
       ]
-
-    #@lyrics = [
-        #{ :time => 0, :text => "Stronger" },
-        #{ :time => 3.000, :text => "Stronger" },
-      #]
 
     self
   end
@@ -135,7 +167,7 @@ class TextScrollerInput
 
   def load_lyrics_file
     @lyrics = JSON.parse(File.read("daftpunk_harder.json")).map do |line|
-      { :time => line["time"]["total"] - 50, :text => line["text"] }
+      { :time => line["time"]["total"], :text => line["text"] }
     end
 
     self
@@ -172,4 +204,11 @@ text_scroller = TextScroller.new(
 
 trap("SIGINT") { text_scroller.close; exit }
 
+Thread.new { `afplay harder.m4a` }
+sleep 0.7
+
+#text_scroller.run_websockets("http://37.34.69.176:8080")
 text_scroller.run
+
+#harder = Sound.load('harder.m4a').play
+
