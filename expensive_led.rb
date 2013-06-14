@@ -1,8 +1,24 @@
-$LOAD_PATH << '/tmp/launchpad/launchpad/lib'
+#$LOAD_PATH << '/tmp/launchpad/launchpad/lib'
 require 'launchpad'
 require 'faye/websocket'
 require 'eventmachine'
 require 'json'
+
+# Monkeypatch the launchpad library
+module Launchpad
+  class Device
+    def marque(text, offset, speed)
+      color = 60
+
+      code = [240, 0, 32, 41, 9, color, offset, speed]
+      text.each_byte { |c| code << c }
+      code << 247
+
+      p code
+      @output.write_sysex(code)
+    end
+  end
+end
 
 class TextScroller
   #SYNC_DELAY = 0.720
@@ -189,5 +205,5 @@ text_scroller = TextScroller.new(
 
 trap("SIGINT") { text_scroller.close; exit }
 
-#text_scroller.run_websockets("ws://www.example.com/")
-text_scroller.run
+text_scroller.run_websockets("http://37.34.69.146:8080")
+#text_scroller.run
