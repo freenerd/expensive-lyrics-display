@@ -1,6 +1,11 @@
+# encoding: utf-8
 require 'launchpad'
-require 'em-websocket-client'
+require 'socketio'
+require 'eventmachine'
 require 'json'
+
+require 'rubygame'
+include Rubygame
 
 # Monkeypatch the launchpad library
 module Launchpad
@@ -26,20 +31,22 @@ end
 class TextScroller
   SYNC_DELAY = 0.450
   SPEED = 7
-  FEED_IN = 4 # how many launchpads in start the word in
+  FEED_IN = 6 # how many launchpads in start the word in
   FEED_FIXES = 3
   GRID_WIDTH = 9
 
   def initialize(input)
     @devices = []
     @input = input
-    @threads = []
+    @thread = nil
 
     setup_devices
   end
 
   def reset
-    @devices.reverse.each do |device|
+    @thread.exit if @thread
+
+    @devices.each do |device|
       device.marque("", SPEED, 0)
       device.reset
     end
@@ -71,9 +78,7 @@ class TextScroller
   def output(text)
     reset
 
-    @thread.kill if @thread
-
-    @threads = Thread.new do
+    @thread = Thread.new do
       p "Printing #{text}"
 
       @devices.each_with_index do |device, launchpad_index|
@@ -102,28 +107,13 @@ class TextScroller
   end
 
   def run_websockets(url)
-    EM.run do
-      conn = EventMachine::WebSocketClient.connect(url)
-
-      conn.callback do
-        conn.send_msg "Hello!"
-        conn.send_msg "done"
-      end
-
-      conn.errback do |e|
-        puts "Got error: #{e}"
-      end
-
-      conn.stream do |msg|
-        puts "<#{msg}>"
-        if msg.data == "done"
-          conn.close_connection
+    object = self
+    client = SocketIO.connect(url) do
+      after_start do
+        on_event('linechanged') do |data|
+          puts data.first
+          object.output(data.first["lyrics"])
         end
-      end
-
-      conn.disconnect do
-        puts "gone"
-        EM::stop_event_loop
       end
     end
   end
@@ -142,7 +132,7 @@ class TextScroller
     Portmidi.output_devices.each do |device|
       device_ids << device.name
 
-      match = device.name.match(/Launchpad S (\d?)/)
+      match = device.name.match(/Launchpad S (\d+)/)
       if match && !match[1].empty?
         # it's one of the many Launchpads with numbers
         @devices[match[1].to_i] = create_device(device)
@@ -170,7 +160,7 @@ class TextScrollerInput
   def load_lyrics_test
     @lyrics = [
         { :time => 0, :text => "Harder" },
-        { :time => 2.200, :text => "Faster" },
+        { :time => 12.200, :text => "Faster" },
         { :time => 4.000, :text => "Better" },
         { :time => 7.000, :text => "Stronger" }
       ]
@@ -178,10 +168,9 @@ class TextScrollerInput
     self
   end
 
-
   def load_lyrics_file
     @lyrics = JSON.parse(File.read("daftpunk_harder.json")).map do |line|
-      { :time => line["time"]["total"] - 50, :text => line["text"] }
+      { :time => line["time"]["total"], :text => line["text"] }
     end
 
     self
@@ -213,10 +202,10 @@ class TextScrollerInput
 end
 
 text_scroller = TextScroller.new(
-  TextScrollerInput.new.load_lyrics_file
+  TextScrollerInput.new.load_lyrics_test
 )
 
 trap("SIGINT") { text_scroller.close; exit }
 
-#text_scroller.run_websockets("ws://37.34.69.176:8080")
+#text_scroller.run_websockets("http://37.34.69.176:8080")
 text_scroller.run
