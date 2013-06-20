@@ -1,11 +1,7 @@
-# encoding: utf-8
 require 'launchpad'
 require 'socketio'
 require 'eventmachine'
 require 'json'
-
-require 'rubygame'
-include Rubygame
 
 # Monkeypatch the launchpad library
 module Launchpad
@@ -16,6 +12,7 @@ module Launchpad
       code = [240, 0, 32, 41, 9, color]
 
       # special char for patched launchpad firmware
+      # if you want to use with original firmware, disable via: if false
       code << offset if offset
 
       code << speed
@@ -30,8 +27,8 @@ end
 
 class TextScroller
   SYNC_DELAY = 0.450
-  SPEED = 7
-  FEED_IN = 6 # how many launchpads in start the word in
+  SPEED = 6
+  FEED_IN = 5 # how many launchpads in start the word in
   FEED_FIXES = 3
   GRID_WIDTH = 9
 
@@ -168,6 +165,7 @@ class TextScrollerInput
     self
   end
 
+
   def load_lyrics_file
     @lyrics = JSON.parse(File.read("daftpunk_harder.json")).map do |line|
       { :time => line["time"]["total"], :text => line["text"] }
@@ -195,17 +193,24 @@ class TextScrollerInput
   def ensure_counter
     raise "No lyrics loaded" unless @lyrics
     if @counter >= @lyrics.length
-      # start from beginning
-      @counter = 0
+      exit()
     end
   end
 end
 
 text_scroller = TextScroller.new(
+  # either load lyrics from test or file
   TextScrollerInput.new.load_lyrics_test
+  #TextScrollerInput.new.load_lyrics_file
 )
 
 trap("SIGINT") { text_scroller.close; exit }
 
+# uncomment to play music (you have to provide file)
+#Thread.new { `afplay harder.m4a` }
+#sleep 0.7
+
+# uncomment this and comment .run to use websockets
 #text_scroller.run_websockets("http://37.34.69.176:8080")
 text_scroller.run
+

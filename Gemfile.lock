@@ -1,24 +1,20 @@
 GEM
   remote: https://rubygems.org/
   specs:
-    addressable (2.3.4)
-    em-websocket-client (0.1.1)
-      eventmachine
-      libwebsocket
-    eventmachine (1.0.3)
     ffi (1.9.0)
     launchpad (0.3.0)
       ffi
       portmidi (>= 0.0.6)
-    libwebsocket (0.1.8)
-      addressable
-      websocket
+    mime-types (1.23)
     portmidi (0.0.6)
-    websocket (1.0.7)
+    rest-client (1.6.7)
+      mime-types (>= 1.16)
+    socketio-client (0.0.3)
+      rest-client
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
-  em-websocket-client
   launchpad
+  socketio-client
