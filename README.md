@@ -1,7 +1,6 @@
 # Expensive LED Scrolling Strip
 
 ## What?
-
 This is a script that shows lyrics on several Novation Launchpad S. It uses the built-in scrolling functionality of the launchpad, but delays and offsets the messages to show them scrolling over many pads. To enable offset to make the text start in the middle of the display, we patched the Launchpad firmware.
 
 The software was developed by @freenerd at Music Hack Day Barcelona 2013 with lots of help of Ross from Novation, who wrote the firmware patch. Also the synced lyrics came from MusixMatch.
