@@ -8,9 +8,12 @@ The software was developed by @freenerd at Music Hack Day Barcelona 2013 with lo
 A video demonstration can be seen here:
 https://www.youtube.com/watch?v=AcOoXeCA_-8
 
+Also for reference, the project lives here:
+https://github.com/freenerd/expensive-lyrics-display
+
 ## Requirements
 
-  * 1-16 Novation Launchpad S
+  * 1-16 Novation Launchpad S (original Launchpad will not work, since it has no text scroll)
   * Ruby 1.9.3
   * Portmidi
 
@@ -19,7 +22,11 @@ https://www.youtube.com/watch?v=AcOoXeCA_-8
 
   To install all the dependent gems, use bundler with `bundle install`.
 
-  Connect all the Launchpads you have (i hope it's many!) to your computer. To make use of the offset functionality, you have to put our patched firmware on each. Please refer to the Launchpad manual, on how to do that.
+  Connect all the Launchpads you have (i hope it's many!) to your computer.
+  
+  We use a patched Launchpad S firmware to make the text not start at the beginning, but in the middle of the display. If you don't want to patch your Launchpads, comment out the offset line in the `marque` of expensive_led.rb.
+
+  To patch the firmware, Novation wrote about it here https://focusritedevelopmentteam.wordpress.com/2013/06/10/novation-is-coming-to-sonard/ and the Firmware is in this repository as a file with the name `Launchpad_S_expensive_led_firmware.syx`. The new firmware only adds the new offset CC code to the text scroll command.
 
   Every Launchpad needs a unique sequential device id. To do this, while connecting each Launchpad hold down the session, user1, user2 and mixer buttons. You can then choose the ID of the Launchpad via the top yellow buttons, with 1 in the top left corner and 16 in the bottom right.
 
